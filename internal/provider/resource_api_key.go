@@ -123,6 +123,16 @@ func (r *APIKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	state := plan
 	applyAPIKeyResponse(&state, created)
+
+	// Terraform requires that all values are known (or null) after apply.
+	// For Optional+Computed fields, the plan may contain unknown values; if Seq
+	// omits a field in the create response, ensure we don't persist unknown.
+	if state.OwnerID.IsUnknown() {
+		state.OwnerID = types.StringNull()
+	}
+	if state.Token.IsUnknown() {
+		state.Token = types.StringNull()
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -204,6 +214,14 @@ func (r *APIKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	// Token may not be returned on update; keep previous.
 	if updated.Token == "" {
 		newState.Token = state.Token
+	}
+
+	// Ensure Optional+Computed values are not left as unknown after apply.
+	if newState.OwnerID.IsUnknown() {
+		newState.OwnerID = types.StringNull()
+	}
+	if newState.Token.IsUnknown() {
+		newState.Token = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
