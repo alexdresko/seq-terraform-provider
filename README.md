@@ -15,6 +15,14 @@ Seq API documentation:
 - Go 1.22+
 - Terraform 1.5+
 
+### Dev container
+
+This repo includes a devcontainer that starts Seq in Docker alongside the development environment.
+
+- Dev container docs: [.devcontainer/README.md](.devcontainer/README.md)
+- Seq UI/API (host): `http://localhost:5341`
+- Seq URL from inside the devcontainer: `http://seq:80`
+
 ### Build
 
 ```powershell

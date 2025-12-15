@@ -1,0 +1,50 @@
+{
+  "name": "seq-terraform-provider",
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "dev",
+  "workspaceFolder": "/workspaces/seq-terraform-provider",
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false,
+      "installOhMyZsh": false,
+      "username": "vscode"
+    }
+  },
+  "forwardPorts": [
+    5341
+  ],
+  "portsAttributes": {
+    "5341": {
+      "label": "Seq UI/API",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "remoteEnv": {
+    "SEQ_SERVER_URL": "http://seq:80"
+  },
+  "postCreateCommand": "go env -w GOPATH=/home/vscode/go && go mod tidy && go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "go.toolsManagement.autoUpdate": true,
+        "go.useLanguageServer": true
+      },
+      "extensions": [
+        "golang.Go",
+        "HashiCorp.terraform",
+        "ms-azuretools.vscode-docker",
+        "EditorConfig.EditorConfig"
+      ]
+    }
+  }
+}
