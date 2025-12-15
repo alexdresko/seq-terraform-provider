@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -109,7 +110,7 @@ func (r *APIKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	body, diags := apiKeyRequestBody(ctx, plan)
+	body, diags := apiKeyRequestBody(ctx, plan, "AssignedPermissions")
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -117,8 +118,22 @@ func (r *APIKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	var created apiKeyResponse
 	if err := r.client.doJSON(ctx, http.MethodPost, "/api/apikeys", body, &created); err != nil {
-		resp.Diagnostics.AddError("Failed to create Seq API key", err.Error())
-		return
+		// Back-compat: some Seq versions use "Permissions" instead of "AssignedPermissions".
+		var httpErr *HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusBadRequest && strings.Contains(httpErr.Message, "AssignedPermissions") {
+			legacyBody, legacyDiags := apiKeyRequestBody(ctx, plan, "Permissions")
+			resp.Diagnostics.Append(legacyDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			if err2 := r.client.doJSON(ctx, http.MethodPost, "/api/apikeys", legacyBody, &created); err2 != nil {
+				resp.Diagnostics.AddError("Failed to create Seq API key", err2.Error())
+				return
+			}
+		} else {
+			resp.Diagnostics.AddError("Failed to create Seq API key", err.Error())
+			return
+		}
 	}
 
 	state := plan
@@ -194,7 +209,7 @@ func (r *APIKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	body, diags := apiKeyRequestBody(ctx, plan)
+	body, diags := apiKeyRequestBody(ctx, plan, "AssignedPermissions")
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -203,8 +218,21 @@ func (r *APIKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	var updated apiKeyResponse
 	path := "/api/apikeys/" + state.ID.ValueString()
 	if err := r.client.doJSON(ctx, http.MethodPut, path, body, &updated); err != nil {
-		resp.Diagnostics.AddError("Failed to update Seq API key", err.Error())
-		return
+		var httpErr *HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusBadRequest && strings.Contains(httpErr.Message, "AssignedPermissions") {
+			legacyBody, legacyDiags := apiKeyRequestBody(ctx, plan, "Permissions")
+			resp.Diagnostics.Append(legacyDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			if err2 := r.client.doJSON(ctx, http.MethodPut, path, legacyBody, &updated); err2 != nil {
+				resp.Diagnostics.AddError("Failed to update Seq API key", err2.Error())
+				return
+			}
+		} else {
+			resp.Diagnostics.AddError("Failed to update Seq API key", err.Error())
+			return
+		}
 	}
 
 	newState := plan
@@ -258,14 +286,17 @@ func (r *APIKeyResource) ImportState(ctx context.Context, req resource.ImportSta
 }
 
 type apiKeyResponse struct {
-	ID          string   `json:"Id"`
-	Title       string   `json:"Title"`
-	Token       string   `json:"Token"`
-	OwnerID     string   `json:"OwnerId"`
+	ID      string `json:"Id"`
+	Title   string `json:"Title"`
+	Token   string `json:"Token"`
+	OwnerID string `json:"OwnerId"`
+	// Newer Seq versions use AssignedPermissions.
+	AssignedPermissions []string `json:"AssignedPermissions"`
+	// Older Seq versions use Permissions.
 	Permissions []string `json:"Permissions"`
 }
 
-func apiKeyRequestBody(ctx context.Context, plan APIKeyModel) (map[string]any, diag.Diagnostics) {
+func apiKeyRequestBody(ctx context.Context, plan APIKeyModel, permissionsField string) (map[string]any, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	body := map[string]any{
@@ -282,7 +313,7 @@ func apiKeyRequestBody(ctx context.Context, plan APIKeyModel) (map[string]any, d
 		if diags.HasError() {
 			return nil, diags
 		}
-		body["Permissions"] = perms
+		body[permissionsField] = perms
 	}
 
 	return body, diags
@@ -301,8 +332,12 @@ func applyAPIKeyResponse(state *APIKeyModel, resp apiKeyResponse) {
 	if resp.OwnerID != "" {
 		state.OwnerID = types.StringValue(resp.OwnerID)
 	}
-	if resp.Permissions != nil {
-		state.Permissions = types.SetValueMust(types.StringType, stringSliceToAttrValues(resp.Permissions))
+	perms := resp.AssignedPermissions
+	if perms == nil {
+		perms = resp.Permissions
+	}
+	if perms != nil {
+		state.Permissions = types.SetValueMust(types.StringType, stringSliceToAttrValues(perms))
 	}
 }
 

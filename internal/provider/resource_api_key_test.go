@@ -35,11 +35,14 @@ func TestAPIKeyRequestBody(t *testing.T) {
 		OwnerID:     types.StringValue("owner"),
 		Permissions: types.SetValueMust(types.StringType, []attr.Value{types.StringValue("Read"), types.StringValue("Write")}),
 	}
-	body, diags := apiKeyRequestBody(context.Background(), m)
+	body, diags := apiKeyRequestBody(context.Background(), m, "AssignedPermissions")
 	if diags.HasError() {
 		t.Fatalf("unexpected diagnostics")
 	}
 	if body["Title"].(string) != "x" {
 		t.Fatalf("title mismatch")
+	}
+	if _, ok := body["AssignedPermissions"]; !ok {
+		t.Fatalf("expected AssignedPermissions in request body")
 	}
 }

@@ -19,11 +19,11 @@ import (
 const defaultServerURL = "http://seq:80"
 
 type apiKeyResponse struct {
-	ID          string   `json:"Id"`
-	Title       string   `json:"Title"`
-	Token       string   `json:"Token"`
-	OwnerID     string   `json:"OwnerId"`
-	Permissions []string `json:"Permissions"`
+	ID                  string   `json:"Id"`
+	Title               string   `json:"Title"`
+	Token               string   `json:"Token"`
+	OwnerID             string   `json:"OwnerId"`
+	AssignedPermissions []string `json:"AssignedPermissions"`
 }
 
 func TestSeqContainer_HealthAndAPIKeyCRUD(t *testing.T) {
@@ -54,8 +54,8 @@ func TestSeqContainer_HealthAndAPIKeyCRUD(t *testing.T) {
 	// 2) Create an API key.
 	title := fmt.Sprintf("terraform-acceptance-%d", time.Now().UnixNano())
 	createBody := map[string]any{
-		"Title":       title,
-		"Permissions": []string{"Read"},
+		"Title":               title,
+		"AssignedPermissions": []string{"Read"},
 	}
 
 	var created apiKeyResponse
@@ -82,6 +82,9 @@ func TestSeqContainer_HealthAndAPIKeyCRUD(t *testing.T) {
 	if got.Title != title {
 		t.Fatalf("read api key: expected Title %q, got %q", title, got.Title)
 	}
+	if !containsString(got.AssignedPermissions, "Read") {
+		t.Fatalf("read api key: expected AssignedPermissions to contain %q, got %v", "Read", got.AssignedPermissions)
+	}
 
 	// 4) Delete it.
 	if err := doRequest(ctx, client, apiKey, http.MethodDelete, serverURL+"/api/apikeys/"+created.ID, nil, nil); err != nil {
@@ -96,6 +99,15 @@ func TestSeqContainer_HealthAndAPIKeyCRUD(t *testing.T) {
 	if !strings.Contains(err.Error(), "404") {
 		t.Fatalf("expected 404 after delete, got: %v", err)
 	}
+}
+
+func containsString(vs []string, want string) bool {
+	for _, v := range vs {
+		if v == want {
+			return true
+		}
+	}
+	return false
 }
 
 func doRequest(ctx context.Context, client *http.Client, apiKey, method, url string, body any, out any) error {
