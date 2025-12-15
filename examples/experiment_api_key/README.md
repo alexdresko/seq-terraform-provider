@@ -18,20 +18,37 @@ Do not commit real credentials to version control in production. Prefer `SEQ_API
 
 ## Run (devcontainer)
 
-1) Build the provider:
+### Quick start (scripts)
 
-From the repo root:
+From this directory:
 
-- `go build -o bin/terraform-provider-seq .`
+```bash
+./plan.sh      # Build provider + terraform plan
+./apply.sh     # Build provider + terraform apply
+./destroy.sh   # Terraform destroy (no rebuild)
+./clean.sh     # Remove .terraform, state files
+```
 
-2) Use the provided Terraform CLI config file (`terraform.tfrc`) to load the provider from the local `bin/` directory:
+### Manual steps
 
-- `export TF_CLI_CONFIG_FILE="$PWD/terraform.tfrc"`
+1) Build the provider (from repo root):
+
+```bash
+go build -o bin/terraform-provider-seq .
+```
+
+2) Set CLI config to use local provider:
+
+```bash
+export TF_CLI_CONFIG_FILE="$PWD/terraform.tfrc"
+```
 
 3) Initialize and apply:
 
-- `terraform init`
-- `terraform apply`
+```bash
+terraform init
+terraform apply
+```
 
 ## Notes
 

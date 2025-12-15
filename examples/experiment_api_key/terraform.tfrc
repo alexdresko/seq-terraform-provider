@@ -1,6 +1,6 @@
 provider_installation {
   dev_overrides {
-    "alexdresko/seq" = "/workspaces/terraform-provider-seq/bin"
+    "alexdresko/seq" = "/workspaces/seq-terraform-provider/bin"
   }
 
   direct {

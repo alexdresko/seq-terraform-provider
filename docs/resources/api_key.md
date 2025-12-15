@@ -12,10 +12,28 @@ Seq may only return the key `token` at creation time; it is stored in Terraform 
 
 ## Example Usage
 
+### Basic API Key
+
 ```terraform
 resource "seq_api_key" "ingest" {
   title       = "terraform-ingest"
   permissions = ["Ingest"]
+}
+```
+
+### API Key with Input Settings
+
+```terraform
+resource "seq_api_key" "app_ingest" {
+  title         = "my-application"
+  permissions   = ["Ingest"]
+  minimum_level = "Warning"
+  filter        = "@Level = 'Error' or @Level = 'Fatal'"
+  
+  applied_properties = {
+    Application = "MyApp"
+    Environment = "Production"
+  }
 }
 ```
 
@@ -28,6 +46,9 @@ resource "seq_api_key" "ingest" {
 
 ### Optional
 
+- `applied_properties` (Map of String) Properties to attach to all events ingested via this API key. These will override any existing properties with the same names.
+- `filter` (String) A filter expression to apply to incoming events. Only events matching the filter will be ingested.
+- `minimum_level` (String) Minimum log level for events ingested via this API key (e.g. Verbose, Debug, Information, Warning, Error, Fatal). Events below this level will be discarded.
 - `owner_id` (String) Owner principal id. Depending on permissions, you may only be able to set this to yourself.
 - `permissions` (Set of String) Permissions delegated to the API key (e.g. Read, Write, Ingest, Project, System).
 

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -31,11 +32,14 @@ type APIKeyResource struct {
 
 // APIKeyModel is the Terraform state model for an API key.
 type APIKeyModel struct {
-	ID          types.String `tfsdk:"id"`
-	Title       types.String `tfsdk:"title"`
-	Token       types.String `tfsdk:"token"`
-	OwnerID     types.String `tfsdk:"owner_id"`
-	Permissions types.Set    `tfsdk:"permissions"`
+	ID                types.String `tfsdk:"id"`
+	Title             types.String `tfsdk:"title"`
+	Token             types.String `tfsdk:"token"`
+	OwnerID           types.String `tfsdk:"owner_id"`
+	Permissions       types.Set    `tfsdk:"permissions"`
+	MinimumLevel      types.String `tfsdk:"minimum_level"`
+	Filter            types.String `tfsdk:"filter"`
+	AppliedProperties types.Map    `tfsdk:"applied_properties"`
 }
 
 func NewAPIKeyResource() resource.Resource {
@@ -80,6 +84,22 @@ func (r *APIKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:    true,
 				ElementType: types.StringType,
 			},
+			"minimum_level": schema.StringAttribute{
+				Description: "Minimum log level for events ingested via this API key (e.g. Verbose, Debug, Information, Warning, Error, Fatal). Events below this level will be discarded.",
+				Optional:    true,
+				Validators: []frameworkvalidator.String{
+					stringvalidator.OneOf("Verbose", "Debug", "Information", "Warning", "Error", "Fatal"),
+				},
+			},
+			"filter": schema.StringAttribute{
+				Description: "A filter expression to apply to incoming events. Only events matching the filter will be ingested.",
+				Optional:    true,
+			},
+			"applied_properties": schema.MapAttribute{
+				Description: "Properties to attach to all events ingested via this API key. These will override any existing properties with the same names.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
 		},
 	}
 }
@@ -110,7 +130,7 @@ func (r *APIKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	body, diags := apiKeyRequestBody(ctx, plan, "AssignedPermissions")
+	body, diags := apiKeyRequestBody(ctx, plan, "AssignedPermissions", "")
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -121,7 +141,7 @@ func (r *APIKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		// Back-compat: some Seq versions use "Permissions" instead of "AssignedPermissions".
 		var httpErr *HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusBadRequest && strings.Contains(httpErr.Message, "AssignedPermissions") {
-			legacyBody, legacyDiags := apiKeyRequestBody(ctx, plan, "Permissions")
+			legacyBody, legacyDiags := apiKeyRequestBody(ctx, plan, "Permissions", "")
 			resp.Diagnostics.Append(legacyDiags...)
 			if resp.Diagnostics.HasError() {
 				return
@@ -209,18 +229,19 @@ func (r *APIKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	body, diags := apiKeyRequestBody(ctx, plan, "AssignedPermissions")
+	apiKeyID := state.ID.ValueString()
+	body, diags := apiKeyRequestBody(ctx, plan, "AssignedPermissions", apiKeyID)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	var updated apiKeyResponse
-	path := "/api/apikeys/" + state.ID.ValueString()
+	path := "/api/apikeys/" + apiKeyID
 	if err := r.client.doJSON(ctx, http.MethodPut, path, body, &updated); err != nil {
 		var httpErr *HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusBadRequest && strings.Contains(httpErr.Message, "AssignedPermissions") {
-			legacyBody, legacyDiags := apiKeyRequestBody(ctx, plan, "Permissions")
+			legacyBody, legacyDiags := apiKeyRequestBody(ctx, plan, "Permissions", apiKeyID)
 			resp.Diagnostics.Append(legacyDiags...)
 			if resp.Diagnostics.HasError() {
 				return
@@ -293,14 +314,36 @@ type apiKeyResponse struct {
 	// Newer Seq versions use AssignedPermissions.
 	AssignedPermissions []string `json:"AssignedPermissions"`
 	// Older Seq versions use Permissions.
-	Permissions []string `json:"Permissions"`
+	Permissions   []string           `json:"Permissions"`
+	InputSettings *inputSettingsPart `json:"InputSettings"`
 }
 
-func apiKeyRequestBody(ctx context.Context, plan APIKeyModel, permissionsField string) (map[string]any, diag.Diagnostics) {
+type inputSettingsPart struct {
+	AppliedProperties []eventPropertyPart    `json:"AppliedProperties"`
+	Filter            *descriptiveFilterPart `json:"Filter"`
+	MinimumLevel      *string                `json:"MinimumLevel"`
+}
+
+type eventPropertyPart struct {
+	Name  string `json:"Name"`
+	Value any    `json:"Value"`
+}
+
+type descriptiveFilterPart struct {
+	Filter          string `json:"Filter"`
+	FilterNonStrict string `json:"FilterNonStrict"`
+}
+
+func apiKeyRequestBody(ctx context.Context, plan APIKeyModel, permissionsField string, id string) (map[string]any, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	body := map[string]any{
 		"Title": plan.Title.ValueString(),
+	}
+
+	// Include Id in the body for update operations (Seq requires it to match the URL)
+	if id != "" {
+		body["Id"] = id
 	}
 
 	if !plan.OwnerID.IsNull() && !plan.OwnerID.IsUnknown() && plan.OwnerID.ValueString() != "" {
@@ -314,6 +357,40 @@ func apiKeyRequestBody(ctx context.Context, plan APIKeyModel, permissionsField s
 			return nil, diags
 		}
 		body[permissionsField] = perms
+	}
+
+	// Build InputSettings if any of the input settings fields are set
+	inputSettings := map[string]any{}
+
+	if !plan.MinimumLevel.IsNull() && !plan.MinimumLevel.IsUnknown() {
+		inputSettings["MinimumLevel"] = plan.MinimumLevel.ValueString()
+	}
+
+	if !plan.Filter.IsNull() && !plan.Filter.IsUnknown() {
+		inputSettings["Filter"] = map[string]any{
+			"Filter":          plan.Filter.ValueString(),
+			"FilterNonStrict": plan.Filter.ValueString(),
+		}
+	}
+
+	if !plan.AppliedProperties.IsNull() && !plan.AppliedProperties.IsUnknown() {
+		var propsMap map[string]string
+		diags.Append(plan.AppliedProperties.ElementsAs(ctx, &propsMap, false)...)
+		if diags.HasError() {
+			return nil, diags
+		}
+		var props []map[string]any
+		for name, value := range propsMap {
+			props = append(props, map[string]any{
+				"Name":  name,
+				"Value": value,
+			})
+		}
+		inputSettings["AppliedProperties"] = props
+	}
+
+	if len(inputSettings) > 0 {
+		body["InputSettings"] = inputSettings
 	}
 
 	return body, diags
@@ -338,6 +415,72 @@ func applyAPIKeyResponse(state *APIKeyModel, resp apiKeyResponse) {
 	}
 	if perms != nil {
 		state.Permissions = types.SetValueMust(types.StringType, stringSliceToAttrValues(perms))
+	}
+
+	// Apply InputSettings fields
+	if resp.InputSettings != nil {
+		if resp.InputSettings.MinimumLevel != nil && *resp.InputSettings.MinimumLevel != "" {
+			state.MinimumLevel = types.StringValue(*resp.InputSettings.MinimumLevel)
+		} else {
+			state.MinimumLevel = types.StringNull()
+		}
+
+		if resp.InputSettings.Filter != nil && resp.InputSettings.Filter.Filter != "" {
+			// Prefer FilterNonStrict if available, otherwise use Filter
+			filterValue := resp.InputSettings.Filter.FilterNonStrict
+			if filterValue == "" {
+				filterValue = resp.InputSettings.Filter.Filter
+			}
+			state.Filter = types.StringValue(filterValue)
+		} else {
+			state.Filter = types.StringNull()
+		}
+
+		if len(resp.InputSettings.AppliedProperties) > 0 {
+			propsMap := make(map[string]attr.Value)
+			for _, prop := range resp.InputSettings.AppliedProperties {
+				// Convert value to string
+				var strValue string
+				switch v := prop.Value.(type) {
+				case string:
+					strValue = v
+				default:
+					// For non-string values, use JSON representation
+					strValue = anyToString(v)
+				}
+				propsMap[prop.Name] = types.StringValue(strValue)
+			}
+			state.AppliedProperties = types.MapValueMust(types.StringType, propsMap)
+		} else {
+			state.AppliedProperties = types.MapNull(types.StringType)
+		}
+	} else {
+		state.MinimumLevel = types.StringNull()
+		state.Filter = types.StringNull()
+		state.AppliedProperties = types.MapNull(types.StringType)
+	}
+}
+
+func anyToString(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch val := v.(type) {
+	case string:
+		return val
+	case float64:
+		// JSON numbers are float64, format without trailing zeros
+		if val == float64(int64(val)) {
+			return fmt.Sprintf("%d", int64(val))
+		}
+		return fmt.Sprintf("%g", val)
+	case bool:
+		if val {
+			return "true"
+		}
+		return "false"
+	default:
+		return fmt.Sprintf("%v", val)
 	}
 }
 

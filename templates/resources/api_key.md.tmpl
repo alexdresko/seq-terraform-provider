@@ -12,10 +12,28 @@ Seq may only return the key `token` at creation time; it is stored in Terraform 
 
 ## Example Usage
 
+### Basic API Key
+
 ```terraform
 resource "seq_api_key" "ingest" {
   title       = "terraform-ingest"
   permissions = ["Ingest"]
+}
+```
+
+### API Key with Input Settings
+
+```terraform
+resource "seq_api_key" "app_ingest" {
+  title         = "my-application"
+  permissions   = ["Ingest"]
+  minimum_level = "Warning"
+  filter        = "@Level = 'Error' or @Level = 'Fatal'"
+  
+  applied_properties = {
+    Application = "MyApp"
+    Environment = "Production"
+  }
 }
 ```
 
