@@ -1,8 +1,8 @@
 terraform {
   required_providers {
     seq = {
-      source  = "example/seq"
-      version = "0.0.1"
+      source  = "alexdresko/seq"
+      version = ">= 0.0.0"
     }
   }
 }

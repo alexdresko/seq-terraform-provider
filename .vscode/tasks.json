@@ -32,8 +32,8 @@
     {
       "label": "docs: generate",
       "type": "shell",
-      "command": "go",
-      "args": ["run", "github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs"],
+      "command": "./scripts/generate-docs.sh",
+      "args": [],
       "problemMatcher": []
     }
   ]

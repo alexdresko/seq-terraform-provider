@@ -3,7 +3,7 @@ terraform {
 
   required_providers {
     seq = {
-      source = "example/seq"
+      source = "alexdresko/seq"
       # When using provider development overrides (terraform.tfrc), do not pin a
       # version here or Terraform may try to query the public registry.
     }

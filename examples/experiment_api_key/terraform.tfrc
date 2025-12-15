@@ -1,9 +1,9 @@
 provider_installation {
   dev_overrides {
-    "example/seq" = "/workspaces/seq-terraform-provider/bin"
+    "alexdresko/seq" = "/workspaces/terraform-provider-seq/bin"
   }
 
   direct {
-    exclude = ["example/seq"]
+    exclude = ["alexdresko/seq"]
   }
 }

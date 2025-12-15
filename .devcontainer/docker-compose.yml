@@ -5,7 +5,7 @@ services:
     image: mcr.microsoft.com/devcontainers/base:ubuntu-24.04
     privileged: true
     volumes:
-      - ..:/workspaces/seq-terraform-provider:cached
+      - ..:/workspaces/terraform-provider-seq:cached
       - docker-data:/var/lib/docker
     command: sleep infinity
     depends_on:

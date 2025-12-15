@@ -1,10 +1,10 @@
 {
-  "name": "seq-terraform-provider",
+  "name": "terraform-provider-seq",
   "dockerComposeFile": [
     "docker-compose.yml"
   ],
   "service": "dev",
-  "workspaceFolder": "/workspaces/seq-terraform-provider",
+  "workspaceFolder": "/workspaces/terraform-provider-seq",
   "features": {
     "ghcr.io/devcontainers/features/go:1": {
       "version": "latest"

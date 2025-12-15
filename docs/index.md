@@ -6,13 +6,9 @@ description: |-
 
 # Seq Provider
 
-This provider manages Seq resources using the Seq server HTTP API.
+Primary focus: managing Seq API keys.
 
-## Authentication
-
-The provider authenticates using a Seq API key sent via the `X-Seq-ApiKey` header.
-
-## Example
+## Example Usage
 
 ```terraform
 provider "seq" {

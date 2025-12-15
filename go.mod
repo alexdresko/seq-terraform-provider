@@ -1,4 +1,4 @@
-module github.com/example/terraform-provider-seq
+module github.com/alexdresko/terraform-provider-seq
 
 go 1.24.0
 
