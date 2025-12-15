@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "go: fmt",
+      "type": "shell",
+      "command": "gofmt",
+      "args": ["-w", "."],
+      "problemMatcher": []
+    },
+    {
+      "label": "go: test",
+      "type": "shell",
+      "command": "go",
+      "args": ["test", "./..."],
+      "problemMatcher": []
+    },
+    {
+      "label": "provider: build",
+      "type": "shell",
+      "command": "go",
+      "args": ["build", "-o", "bin/terraform-provider-seq.exe", "."],
+      "problemMatcher": []
+    },
+    {
+      "label": "terraform: fmt",
+      "type": "shell",
+      "command": "terraform",
+      "args": ["fmt", "-recursive"],
+      "problemMatcher": []
+    },
+    {
+      "label": "docs: generate",
+      "type": "shell",
+      "command": "go",
+      "args": ["run", "github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs"],
+      "problemMatcher": []
+    }
+  ]
+}

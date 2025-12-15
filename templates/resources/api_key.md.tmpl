@@ -1,0 +1,22 @@
+---
+page_title: "seq_api_key (Resource)"
+description: |-
+  Manages a Seq API key.
+---
+
+# seq_api_key (Resource)
+
+Use this resource to create and manage API keys in Seq via `/api/apikeys`.
+
+Seq may only return the key `token` at creation time; it is stored in Terraform state as a sensitive attribute.
+
+## Example Usage
+
+```terraform
+resource "seq_api_key" "ingest" {
+  title       = "terraform-ingest"
+  permissions = ["Ingest"]
+}
+```
+
+{{ .SchemaMarkdown }}
