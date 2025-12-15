@@ -86,7 +86,6 @@ Terraform Registry publishing is automated via GoReleaser + GitHub Actions.
   - The Registry requires signed releases and does **not** accept default ECC keys; use RSA/DSA.
 - GitHub repo secrets (Settings → Secrets and variables → Actions):
   - `GPG_PRIVATE_KEY`: ASCII-armored private key export (e.g. `gpg --armor --export-secret-keys <KEYID>`)
-  - `GPG_PASSPHRASE`: the private key passphrase
   - `GPG_FINGERPRINT`: the key fingerprint GoReleaser should use for signing
 
 ### Releasing
